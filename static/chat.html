@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Nexus AI · 智能对话终端</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            background: radial-gradient(circle at 20% 30%, #0a0f1e, #03060c);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Inter', 'Segoe UI', 'Poppins', system-ui, -apple-system, 'Microsoft YaHei', sans-serif;
+            padding: 24px;
+        }
+
+        /* 主容器 - 全宽聊天区 */
+        .app-container {
+            width: 1400px;
+            max-width: 98vw;
+            height: 90vh;
+            background: rgba(12, 18, 28, 0.65);
+            backdrop-filter: blur(16px);
+            border-radius: 2rem;
+            border: 1px solid rgba(0, 255, 255, 0.25);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        /* 头部 */
+        .header {
+            padding: 18px 24px;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            background: rgba(0, 0, 0, 0.3);
+        }
+        .title h1 {
+            font-size: 1.6rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #aaffff, #00ccff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: -0.5px;
+        }
+        .title p {
+            font-size: 0.75rem;
+            color: #7f8c9a;
+            margin-top: 4px;
+            letter-spacing: 0.5px;
+        }
+        .status-badge {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        .badge {
+            background: rgba(0, 200, 200, 0.15);
+            border-radius: 40px;
+            padding: 6px 14px;
+            font-size: 0.75rem;
+            color: #2ef7f7;
+            border: 1px solid rgba(0, 255, 255, 0.4);
+            backdrop-filter: blur(4px);
+            font-weight: 500;
+        }
+        .settings-icon {
+            background: rgba(0, 200, 200, 0.2);
+            border: 1px solid rgba(0, 255, 255, 0.5);
+            border-radius: 40px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: 0.2s;
+            font-size: 1.4rem;
+            backdrop-filter: blur(4px);
+        }
+        .settings-icon:hover {
+            background: rgba(0, 200, 200, 0.4);
+            border-color: #0ff;
+            box-shadow: 0 0 10px cyan;
+            transform: scale(1.02);
+        }
+
+        /* 聊天消息区域 */
+        .messages-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            scroll-behavior: smooth;
+        }
+        .messages-area::-webkit-scrollbar {
+            width: 5px;
+        }
+        .messages-area::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+        }
+        .messages-area::-webkit-scrollbar-thumb {
+            background: #0cc;
+            border-radius: 10px;
+        }
+
+        /* 消息气泡样式 */
+        .message {
+            max-width: 80%;
+            display: flex;
+            flex-direction: column;
+            animation: fadeSlideUp 0.25s ease-out;
+        }
+        .user-message {
+            align-self: flex-end;
+        }
+        .bot-message {
+            align-self: flex-start;
+        }
+        .system-message {
+            align-self: center;
+            max-width: 90%;
+            margin: 8px auto;
+        }
+        .bubble {
+            padding: 12px 18px;
+            border-radius: 24px;
+            line-height: 1.5;
+            font-size: 0.95rem;
+            word-break: break-word;
+            white-space: pre-wrap;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            transition: all 0.2s;
+        }
+        .user-message .bubble {
+            background: linear-gradient(145deg, #00ccaa, #009688);
+            color: white;
+            border-bottom-right-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .bot-message .bubble {
+            background: rgba(20, 30, 45, 0.9);
+            backdrop-filter: blur(8px);
+            color: #eef4ff;
+            border-bottom-left-radius: 6px;
+            border: 1px solid rgba(0, 255, 255, 0.3);
+        }
+        .system-message .bubble {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid #ffaa33;
+            color: #ffdd99;
+            font-size: 0.8rem;
+            text-align: center;
+            backdrop-filter: blur(8px);
+            border-radius: 20px;
+        }
+        .loading .bubble {
+            background: rgba(30, 40, 55, 0.8);
+            color: #88aaff;
+            font-style: italic;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .loading .bubble::before {
+            content: '';
+            width: 16px;
+            height: 16px;
+            border: 2px solid #0cc;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        @keyframes fadeSlideUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 底部输入区 */
+        .input-panel {
+            padding: 20px 24px;
+            background: rgba(0, 0, 0, 0.4);
+            border-top: 1px solid rgba(0, 255, 255, 0.2);
+        }
+        .input-wrapper {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+        .input-group {
+            flex: 1;
+            background: rgba(15, 25, 35, 0.7);
+            border-radius: 48px;
+            border: 1px solid rgba(0, 255, 255, 0.4);
+            transition: all 0.2s;
+        }
+        .input-group:focus-within {
+            border-color: #0cc;
+            box-shadow: 0 0 12px rgba(0, 204, 204, 0.3);
+        }
+        #userInput {
+            width: 100%;
+            background: transparent;
+            border: none;
+            padding: 14px 20px;
+            font-size: 1rem;
+            color: #f0f3fc;
+            outline: none;
+            font-family: inherit;
+        }
+        #userInput::placeholder {
+            color: #6c7a8e;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+        }
+        .icon-btn {
+            background: rgba(0, 200, 200, 0.15);
+            border: 1px solid rgba(0, 255, 255, 0.5);
+            border-radius: 40px;
+            padding: 10px 18px;
+            font-weight: 500;
+            color: #ccffff;
+            cursor: pointer;
+            transition: 0.2s;
+            backdrop-filter: blur(5px);
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .icon-btn:hover:not(:disabled) {
+            background: rgba(0, 200, 200, 0.4);
+            border-color: #0ff;
+            box-shadow: 0 0 8px cyan;
+            transform: scale(1.02);
+        }
+        .icon-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        #sendBtn {
+            background: linear-gradient(145deg, #00ccaa, #009977);
+            border: none;
+            color: white;
+            font-weight: bold;
+        }
+
+        /* ---------- 模态框 (独立设置窗口) ---------- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            visibility: hidden;
+            opacity: 0;
+            transition: visibility 0.2s, opacity 0.2s;
+        }
+        .modal-overlay.active {
+            visibility: visible;
+            opacity: 1;
+        }
+        .modal-container {
+            width: 550px;
+            max-width: 90vw;
+            max-height: 85vh;
+            background: rgba(12, 22, 35, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 2rem;
+            border: 1px solid rgba(0, 255, 255, 0.4);
+            box-shadow: 0 25px 40px rgba(0,0,0,0.5), 0 0 20px rgba(0,255,255,0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .modal-header {
+            padding: 18px 24px;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0,0,0,0.3);
+        }
+        .modal-header h2 {
+            font-size: 1.3rem;
+            color: #aaffff;
+            letter-spacing: 1px;
+        }
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 28px;
+            color: #8cc;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .close-modal:hover {
+            color: #0ff;
+            transform: scale(1.1);
+        }
+        .modal-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+        }
+        .settings-section {
+            border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+            padding-bottom: 16px;
+        }
+        .section-title {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #5fe7e7;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .control-group {
+            margin-bottom: 16px;
+        }
+        .control-group label {
+            display: block;
+            font-size: 0.8rem;
+            color: #bbd4ff;
+            margin-bottom: 8px;
+        }
+        input, select, textarea {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(0, 255, 255, 0.4);
+            border-radius: 12px;
+            padding: 8px 12px;
+            color: #eef4ff;
+            font-size: 0.85rem;
+            outline: none;
+            transition: 0.2s;
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: #0cc;
+            box-shadow: 0 0 8px rgba(0, 204, 204, 0.3);
+        }
+        .slider-value {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 6px;
+            font-size: 0.7rem;
+            color: #7f9fcf;
+        }
+        input[type="range"] {
+            padding: 0;
+            accent-color: #0cc;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 70px;
+            font-family: monospace;
+        }
+        .model-hint {
+            font-size: 0.7rem;
+            color: #5aa9dd;
+            margin-top: 5px;
+        }
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid rgba(0, 255, 255, 0.2);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+        .modal-btn {
+            background: rgba(0, 200, 200, 0.2);
+            border: 1px solid rgba(0, 255, 255, 0.5);
+            border-radius: 40px;
+            padding: 8px 20px;
+            color: #ccffff;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .modal-btn.primary {
+            background: linear-gradient(145deg, #00ccaa, #009977);
+            border: none;
+            color: white;
+        }
+        .modal-btn:hover {
+            background: rgba(0, 200, 200, 0.4);
+            border-color: #0ff;
+            box-shadow: 0 0 8px cyan;
+        }
+        .clear-btn {
+            background: rgba(255, 70, 70, 0.2);
+            border-color: #ff7777;
+            color: #ffaaaa;
+            width: 100%;
+            justify-content: center;
+        }
+        .param-badge {
+            background: #0a121f;
+            border-radius: 20px;
+            padding: 5px 10px;
+            font-size: 0.7rem;
+            text-align: center;
+            margin-top: 8px;
+            color: #0cc;
+        }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <!-- 头部（含设置图标） -->
+    <div class="header">
+        <div class="title">
+            <h1>⚡ NEXUS AI</h1>
+            <p>量子对话引擎 · 流式智能响应</p>
+        </div>
+        <div class="status-badge">
+            <div class="badge" id="modelBadge">🧠 qwen3.5:0.8b</div>
+            <div class="badge">🔮 Ollama Ready</div>
+            <div class="settings-icon" id="openSettingsBtn">⚙️</div>
+        </div>
+    </div>
+
+    <!-- 聊天消息区域 -->
+    <div class="messages-area" id="chatContainer">
+        <!-- 系统指令气泡会动态插入 -->
+    </div>
+
+    <!-- 底部输入区 -->
+    <div class="input-panel">
+        <div class="input-wrapper">
+            <div class="input-group">
+                <input type="text" id="userInput" placeholder="输入你的指令...  Enter 发送" autocomplete="off">
+            </div>
+            <div class="action-buttons">
+                <button class="icon-btn" id="stopBtn" disabled>⏹️ 停止</button>
+                <button class="icon-btn" id="sendBtn">🚀 发送</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 模态框 (独立设置窗口) -->
+<div id="settingsModal" class="modal-overlay">
+    <div class="modal-container">
+        <div class="modal-header">
+            <h2>⚙️ 高级设置</h2>
+            <button class="close-modal" id="closeModalBtn">&times;</button>
+        </div>
+        <div class="modal-content">
+            <!-- 模型中枢 -->
+            <div class="settings-section">
+                <div class="section-title">🧬 模型中枢</div>
+                <div class="control-group">
+                    <label>🤖 模型名称 (Ollama)</label>
+                    <input type="text" id="modelName" value="qwen3.5:0.8b" placeholder="例如: llama3, qwen2.5:7b">
+                    <div class="model-hint">确保模型已安装 ollama pull</div>
+                </div>
+            </div>
+
+            <!-- 生成参数 -->
+            <div class="settings-section">
+                <div class="section-title">🎛️ 生成参数</div>
+                <div class="control-group">
+                    <label>🌡️ 温度 Temperature <span id="tempValue">0.7</span></label>
+                    <input type="range" id="temperature" min="0" max="1.5" step="0.05" value="0.7">
+                </div>
+                <div class="control-group">
+                    <label>🎲 Top-P (核采样) <span id="topPValue">0.7</span></label>
+                    <input type="range" id="topP" min="0.1" max="1" step="0.01" value="0.7">
+                </div>
+                <div class="control-group">
+                    <label>📏 Max Tokens (留空=无限制)</label>
+                    <input type="number" id="maxTokens" placeholder="例如 2048" value="">
+                </div>
+                <div class="control-group">
+                    <label>🔄 历史对话轮数 <span id="historyLenVal">5</span></label>
+                    <input type="range" id="historyLen" min="0" max="12" step="1" value="5">
+                    <div class="slider-value">保留最近轮数 (0=无记忆)</div>
+                </div>
+            </div>
+
+            <!-- 系统指令 -->
+            <div class="settings-section">
+                <div class="section-title">📜 系统指令</div>
+                <textarea id="sysPrompt" placeholder="设定AI人格/规则...">你是一个富有创造力的AI助手，拥有科技感思维，回答简洁且富有洞察力。</textarea>
+                <div class="param-badge">⚙️ 修改后实时生效</div>
+            </div>
+
+            <!-- 开场白设置 -->
+            <div class="settings-section">
+                <div class="section-title">💬 开场白设置</div>
+                <div class="control-group">
+                    <label>🤖 AI 首条消息</label>
+                    <textarea id="greetingMessage" rows="2" placeholder="输入AI的第一句话...">✨ 你好！我是 Nexus AI，你的智能伙伴。有什么可以帮你探索？</textarea>
+                    <div class="model-hint">点击下方按钮重置对话并应用新开场白</div>
+                </div>
+                <button class="icon-btn clear-btn" id="applyGreetingBtn">🎭 应用开场白并重置对话</button>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn" id="closeModalFooterBtn">关闭</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // DOM 元素
+    const chatContainer = document.getElementById('chatContainer');
+    const userInput = document.getElementById('userInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const openSettingsBtn = document.getElementById('openSettingsBtn');
+    const settingsModal = document.getElementById('settingsModal');
+    const closeModalBtns = [document.getElementById('closeModalBtn'), document.getElementById('closeModalFooterBtn')];
+    const applyGreetingBtn = document.getElementById('applyGreetingBtn');
+
+    // 参数控件 (模态框内)
+    const modelNameInput = document.getElementById('modelName');
+    const temperatureSlider = document.getElementById('temperature');
+    const tempValueSpan = document.getElementById('tempValue');
+    const topPSlider = document.getElementById('topP');
+    const topPValueSpan = document.getElementById('topPValue');
+    const maxTokensInput = document.getElementById('maxTokens');
+    const historyLenSlider = document.getElementById('historyLen');
+    const historyLenValSpan = document.getElementById('historyLenVal');
+    const sysPromptTextarea = document.getElementById('sysPrompt');
+    const greetingMessageTextarea = document.getElementById('greetingMessage');
+    const modelBadgeSpan = document.getElementById('modelBadge');
+
+    // 全局状态
+    let chatHistory = [];          // 存储 {role, content}
+    let currentAbortController = null;
+    let isGenerating = false;
+    let systemMessageDiv = null;   // 系统指令气泡DOM
+
+    // 更新UI显示参数值 (滑块数值显示)
+    function updateParamLabels() {
+        tempValueSpan.innerText = temperatureSlider.value;
+        topPValueSpan.innerText = topPSlider.value;
+        historyLenValSpan.innerText = historyLenSlider.value;
+        modelBadgeSpan.innerHTML = `🧠 ${modelNameInput.value || 'default'}`;
+    }
+    temperatureSlider.addEventListener('input', updateParamLabels);
+    topPSlider.addEventListener('input', updateParamLabels);
+    historyLenSlider.addEventListener('input', updateParamLabels);
+    modelNameInput.addEventListener('input', () => {
+        modelBadgeSpan.innerHTML = `🧠 ${modelNameInput.value || 'default'}`;
+    });
+
+    // 滚动到底部
+    function scrollToBottom() {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    // 添加消息到界面
+    function addMessage(text, sender, isSystem = false) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message ${sender}-message`;
+        if (isSystem) msgDiv.classList.add('system-message');
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        bubble.innerText = text;
+        msgDiv.appendChild(bubble);
+        chatContainer.appendChild(msgDiv);
+        scrollToBottom();
+        return msgDiv;
+    }
+
+    // 创建/更新系统指令气泡（位于对话顶部）
+    function updateSystemMessage() {
+        const sysText = sysPromptTextarea.value.trim() || "无系统指令";
+        if (systemMessageDiv) {
+            systemMessageDiv.querySelector('.bubble').innerText = `📜 系统指令：${sysText}`;
+        } else {
+            const sysDiv = document.createElement('div');
+            sysDiv.className = 'message system-message';
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            bubble.innerText = `📜 系统指令：${sysText}`;
+            sysDiv.appendChild(bubble);
+            // 插入到聊天容器最前面
+            if (chatContainer.children.length > 0) {
+                chatContainer.insertBefore(sysDiv, chatContainer.firstChild);
+            } else {
+                chatContainer.appendChild(sysDiv);
+            }
+            systemMessageDiv = sysDiv;
+        }
+        scrollToBottom();
+    }
+
+    // 监听系统指令变化，实时更新顶部气泡
+    sysPromptTextarea.addEventListener('input', () => {
+        updateSystemMessage();
+    });
+
+    // 创建流式bot消息
+    function createStreamingMessage() {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'message bot-message';
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        bubble.innerText = '';
+        msgDiv.appendChild(bubble);
+        chatContainer.appendChild(msgDiv);
+        scrollToBottom();
+        return {
+            updateText: (newText) => { bubble.innerText = newText; scrollToBottom(); },
+            getContainer: () => msgDiv,
+        };
+    }
+
+    // loading效果
+    let loadingMessageDiv = null;
+    function showLoadingMessage() {
+        if (loadingMessageDiv) {
+            loadingMessageDiv.remove();
+            loadingMessageDiv = null;
+        }
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'message bot-message loading';
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        bubble.innerText = '正在思考中';
+        msgDiv.appendChild(bubble);
+        chatContainer.appendChild(msgDiv);
+        scrollToBottom();
+        loadingMessageDiv = msgDiv;
+        return msgDiv;
+    }
+    function hideLoadingMessage() {
+        if (loadingMessageDiv) {
+            loadingMessageDiv.remove();
+            loadingMessageDiv = null;
+        }
+    }
+
+    // 重置对话（应用开场白）
+    function resetConversation() {
+        // 中断任何进行中的请求
+        if (currentAbortController) {
+            currentAbortController.abort();
+            currentAbortController = null;
+        }
+        isGenerating = false;
+        sendBtn.disabled = false;
+        stopBtn.disabled = true;
+
+        // 清空历史数组
+        chatHistory = [];
+
+        // 清空聊天区域（但保留系统指令气泡）
+        const children = [...chatContainer.children];
+        for (let child of children) {
+            if (child !== systemMessageDiv) {
+                child.remove();
+            }
+        }
+
+        // 获取开场白
+        let greeting = greetingMessageTextarea.value.trim();
+        if (!greeting) greeting = "✨ 你好！我是你的智能助手。";
+
+        // 添加开场白作为assistant消息（显示并存储历史）
+        addMessage(greeting, 'bot');
+        chatHistory.push({ role: "assistant", content: greeting });
+
+        // 确保系统指令气泡在顶部
+        updateSystemMessage();
+        if (systemMessageDiv && !chatContainer.contains(systemMessageDiv)) {
+            if (chatContainer.children.length > 0) {
+                chatContainer.insertBefore(systemMessageDiv, chatContainer.firstChild);
+            } else {
+                chatContainer.appendChild(systemMessageDiv);
+            }
+        }
+
+        scrollToBottom();
+    }
+
+    // 清空对话（仅清空用户和AI对话，保留开场白）
+    function clearConversationOnly() {
+        if (currentAbortController) {
+            currentAbortController.abort();
+            currentAbortController = null;
+        }
+        isGenerating = false;
+        sendBtn.disabled = false;
+        stopBtn.disabled = true;
+
+        // 清空历史数组
+        chatHistory = [];
+
+        // 移除所有非系统消息
+        const children = [...chatContainer.children];
+        for (let child of children) {
+            if (child !== systemMessageDiv) {
+                child.remove();
+            }
+        }
+
+        // 重新添加开场白
+        let greeting = greetingMessageTextarea.value.trim();
+        if (!greeting) greeting = "✨ 你好！我是你的智能助手。";
+        addMessage(greeting, 'bot');
+        chatHistory.push({ role: "assistant", content: greeting });
+
+        // 确保系统指令存在
+        updateSystemMessage();
+        if (systemMessageDiv && !chatContainer.contains(systemMessageDiv)) {
+            if (chatContainer.children.length > 0) {
+                chatContainer.insertBefore(systemMessageDiv, chatContainer.firstChild);
+            } else {
+                chatContainer.appendChild(systemMessageDiv);
+            }
+        }
+        scrollToBottom();
+    }
+
+    // 发送消息核心逻辑
+    async function sendMessage() {
+        if (isGenerating) return;
+        const query = userInput.value.trim();
+        if (!query) return;
+
+        // 获取实时参数（直接从模态框控件读取）
+        const model = modelNameInput.value.trim() || "qwen3.5:0.8b";
+        const temperature = parseFloat(temperatureSlider.value);
+        const topP = parseFloat(topPSlider.value);
+        let maxTokens = maxTokensInput.value.trim() === "" ? null : parseInt(maxTokensInput.value, 10);
+        if (maxTokens && isNaN(maxTokens)) maxTokens = null;
+        const historyLen = parseInt(historyLenSlider.value, 10);
+        const sys_prompt = sysPromptTextarea.value.trim() || "你是一个有用的助手。";
+
+        // 添加用户消息
+        addMessage(query, 'user');
+        userInput.value = '';
+
+        isGenerating = true;
+        sendBtn.disabled = true;
+        stopBtn.disabled = false;
+
+        // 截断历史（根据history_len）
+        let limitedHistory = [...chatHistory];
+        if (historyLen > 0) {
+            limitedHistory = limitedHistory.slice(-2 * historyLen);
+        }
+
+        showLoadingMessage();
+
+        if (currentAbortController) currentAbortController.abort();
+        currentAbortController = new AbortController();
+        const signal = currentAbortController.signal;
+
+        try {
+            const requestBody = {
+                query: query,
+                sys_prompt: sys_prompt,
+                history: limitedHistory,
+                history_len: historyLen,
+                temperature: temperature,
+                top_p: topP,
+                max_tokens: maxTokens,
+                model: model
+            };
+
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody),
+                signal: signal
+            });
+
+            if (!response.ok) {
+                let errMsg = `后端错误 ${response.status}`;
+                try {
+                    const errText = await response.text();
+                    errMsg = errText || errMsg;
+                } catch(e) {}
+                throw new Error(errMsg);
+            }
+
+            hideLoadingMessage();
+            const streamMsg = createStreamingMessage();
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let fullAnswer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value, { stream: true });
+                fullAnswer += chunk;
+                streamMsg.updateText(fullAnswer);
+            }
+
+            const finalAnswer = fullAnswer || "(无响应内容)";
+            streamMsg.updateText(finalAnswer);
+
+            // 保存历史
+            chatHistory.push({ role: "user", content: query });
+            chatHistory.push({ role: "assistant", content: finalAnswer });
+
+        } catch (err) {
+            hideLoadingMessage();
+            if (err.name === 'AbortError') {
+                addMessage("⏸️ 已停止生成。", 'bot');
+            } else {
+                console.error(err);
+                let errorMsg = `❌ 通信失败: ${err.message}`;
+                if (err.message.includes("Failed to fetch")) errorMsg = "❌ 无法连接后端服务，请确保FastAPI已启动 (python 001.py)";
+                addMessage(errorMsg, 'bot');
+            }
+        } finally {
+            isGenerating = false;
+            sendBtn.disabled = false;
+            stopBtn.disabled = true;
+            currentAbortController = null;
+            scrollToBottom();
+        }
+    }
+
+    function stopGeneration() {
+        if (currentAbortController) {
+            currentAbortController.abort();
+            currentAbortController = null;
+        }
+        isGenerating = false;
+        sendBtn.disabled = false;
+        stopBtn.disabled = true;
+        hideLoadingMessage();
+        addMessage("🛑 已手动停止响应", 'bot');
+    }
+
+    // 模态框开关
+    function openModal() {
+        settingsModal.classList.add('active');
+    }
+    function closeModal() {
+        settingsModal.classList.remove('active');
+    }
+
+    // 事件绑定
+    sendBtn.addEventListener('click', sendMessage);
+    stopBtn.addEventListener('click', stopGeneration);
+    openSettingsBtn.addEventListener('click', openModal);
+    closeModalBtns.forEach(btn => btn.addEventListener('click', closeModal));
+    // 点击模态框背景关闭（可选）
+    settingsModal.addEventListener('click', (e) => {
+        if (e.target === settingsModal) closeModal();
+    });
+    // 应用开场白按钮
+    applyGreetingBtn.addEventListener('click', () => {
+        resetConversation();
+        closeModal(); // 可选关闭设置窗口
+    });
+    // 清空对话按钮（之前没有单独按钮，此处新增）
+    // 可以在模态框内增加一个清空对话按钮，但为了简洁，也可以在头部增加；这里我们在模态框内补充一个清空对话的按钮
+    // 为了方便，在系统指令下面加一个清空对话按钮，但为了不重复修改，我们在模态框内添加一个独立按钮。
+    // 动态在模态框内添加一个按钮（但为了避免样式复杂，直接加在HTML中更好，但为了不破坏已有结构，我们后面在模态框内容里加一个按钮）
+    // 由于HTML已经固定，我们通过JS在模态框合适位置追加一个清空对话按钮
+    const modalContent = document.querySelector('.modal-content');
+    const clearConvBtn = document.createElement('button');
+    clearConvBtn.className = 'icon-btn clear-btn';
+    clearConvBtn.style.marginTop = '10px';
+    clearConvBtn.innerText = '🗑️ 仅清空对话记录';
+    clearConvBtn.addEventListener('click', () => {
+        clearConversationOnly();
+        closeModal();
+    });
+    // 找到开场白设置那个section，在后面插入
+    const greetingSection = document.querySelector('.settings-section:last-of-type');
+    if (greetingSection) {
+        greetingSection.insertAdjacentElement('afterend', clearConvBtn);
+    } else {
+        modalContent.appendChild(clearConvBtn);
+    }
+
+    // 初始化
+    updateParamLabels();
+    stopBtn.disabled = true;
+    updateSystemMessage();
+    resetConversation();
+    userInput.focus();
+</script>
+</body>
+</html>
